@@ -52,14 +52,10 @@ export const getAllItems = async (req: Request, res: Response) => {
             parseInt(limit as string)
         );
 
-        res.json({
-            success: true,
-            ...paginatedResponse
-        });
+        res.json(paginatedResponse);
     } catch (error) {
         console.error('Error fetching items:', error);
         res.status(500).json({
-            success: false,
             error: 'Failed to fetch inventory items'
         });
     }

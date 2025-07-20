@@ -4,11 +4,10 @@ import * as InventoryController from '../controllers/inventory';
 
 const router = express.Router();
 
-router.post('/inventory', InventoryController.createItem);
-router.get('/inventory/:id', InventoryController.getItem);
-router.get('/inventory', InventoryController.getAllItems);
-router.put('/inventory/:id', InventoryController.updateItem); // ✅
-
-router.delete('/inventory/:id', InventoryController.deleteItem);
+router.post('/', InventoryController.createItem);
+router.get('/:id', InventoryController.getItem);
+router.get('/', InventoryController.getAllItems);
+router.put('/:id', InventoryController.updateItem);
+router.delete('/:id', InventoryController.deleteItem);
 
 export default router;
