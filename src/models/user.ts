@@ -76,3 +76,36 @@ export const getPaginatedUsers = async (
         totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
     };
 };
+
+export const updateUser = async (id: number, updates: Partial<User>) => {
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+
+    for (const [key, value] of Object.entries(updates)) {
+        if (value !== undefined && key !== 'id' && key !== 'password') {
+            fields.push(`${key} = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+        }
+    }
+
+    if (updates.password) {
+        fields.push(`password = $${paramIndex}`);
+        values.push(await hashPassword(updates.password));
+        paramIndex++;
+    }
+
+    values.push(id);
+    const query = `
+        UPDATE users
+        SET ${fields.join(', ')}, updated_at = NOW()
+        WHERE id = $${paramIndex}
+        RETURNING id, email, phone, role, created_at`;
+    const { rows } = await pool.query(query, values);
+    return rows[0];
+};
+
+export const deleteUser = async (id: number) => {
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+};

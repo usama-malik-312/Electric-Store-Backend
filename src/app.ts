@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import userRoutes from './routes/users';
+import userRoutes from './routes/user';
 import authRoutes from './routes/auth';
 import inventoryRoutes from './routes/inventory';
 import storeRoutes from './routes/store';

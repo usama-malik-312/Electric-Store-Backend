@@ -5,13 +5,16 @@ import { protect, isOwner } from '../middleware/auth';
 const router = express.Router();
 
 // Protect all routes
-router.use(protect);
+// router.use(protect);
 
 // Owner-only routes
-router.post('/', isOwner, UserController.createUser);
-router.get('/', isOwner, UserController.getUsers);
+router.post('/', UserController.createUser);
+router.get('/', UserController.getUsers);
+router.get('/:id', UserController.getUserById);
+router.put('/:id', UserController.updateUser);
+router.delete('/:id', UserController.deleteUser);
 
 // All authenticated users
-router.get('/me', UserController.getMe);
+// router.get('/me', UserController.getMe);
 
 export default router;
