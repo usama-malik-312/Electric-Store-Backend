@@ -8,6 +8,8 @@ import inventoryRoutes from './routes/inventory';
 import storeRoutes from './routes/store';
 import customerRoutes from './routes/customer';
 import brandRoutes from './routes/brand';
+import supplierRoutes from './routes/supplier';
+import itemGroupRoutes from './routes/itemGroup';
 
 // Load environment variables
 dotenv.config();
@@ -27,8 +29,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/stores', storeRoutes);
-// app.use('/api/customers', customerRoutes);
-// app.use('/api/brands', brandRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/item-groups', itemGroupRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

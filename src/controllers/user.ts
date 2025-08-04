@@ -1,8 +1,9 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import * as UserModel from '../models/user';
+import { AuthenticatedRequest } from '../middleware/auth';
 
 
-export const createUser = async (req: Request, res: Response): Promise<void> => {
+export const createUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const user = await UserModel.createUser(req.body);
     res.status(201).json(user);
@@ -11,7 +12,7 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-export const getUsers = async (req: Request, res: Response): Promise<void> => {
+export const getUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { page = '1', limit = '10', search } = req.query;
     const paginatedResponse = await UserModel.getPaginatedUsers(
@@ -26,7 +27,7 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const getUserById = async (req: Request, res: Response): Promise<void> => {
+export const getUserById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -44,7 +45,7 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const updateUser = async (req: Request, res: Response): Promise<void> => {
+export const updateUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -62,7 +63,7 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+export const deleteUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {

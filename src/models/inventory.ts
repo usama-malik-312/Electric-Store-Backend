@@ -1,43 +1,35 @@
 import pool from "../config/db";
-import { PaginatedResponse } from "../types/inventory";
+import { Inventory } from "../types";
 
-interface InventoryItem {
-    id?: number;
-    name: string;
-    description?: string;
-    sku: string;
-    barcode?: string;
-    category?: string;
-    brand?: string;
-    stock: number;
-    price: number;
-    cost_price?: number;
-    min_stock_level?: number;
-    store_id: number;
-    supplier_id?: number;
-}
-
-export const createItem = async (item: InventoryItem) => {
+export const createItem = async (item: Partial<Inventory>) => {
     const query = `
     INSERT INTO inventory (
-      name, description, sku, barcode, category, brand, 
-      stock, price, cost_price, min_stock_level, store_id, supplier_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        item_name, item_code, brand_id, supplier_id, item_group_id, 
+        description, unit, cost_price, selling_price, tax_percentage, 
+        discount, min_stock_level, stock, store_id, image, 
+        status, created_by, notes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING *`;
 
     const values = [
-        item.name,
+        item.item_name,
+        item.item_code,
+        item.brand_id,
+        item.supplier_id,
+        item.item_group_id,
         item.description,
-        item.sku,
-        item.barcode,
-        item.category,
-        item.brand,
-        item.stock,
-        item.price,
+        item.unit,
         item.cost_price,
-        item.min_stock_level || 5, // Default value
+        item.selling_price,
+        item.tax_percentage || 0,
+        item.discount || 0,
+        item.min_stock_level || 5,
+        item.stock || 0,
         item.store_id,
-        item.supplier_id || null   // Handle optional field
+        item.image,
+        item.status || 'active',
+        item.created_by,
+        item.notes
     ];
 
     const { rows } = await pool.query(query, values);
@@ -49,64 +41,104 @@ export const getItemById = async (id: number) => {
     SELECT 
       i.*,
       s.name as store_name,
-      sup.name as supplier_name
+      s.location as store_location,
+      b.name as brand_name,
+      sup.name as supplier_name,
+      ig.group_name
     FROM inventory i
     LEFT JOIN stores s ON i.store_id = s.id
+    LEFT JOIN brands b ON i.brand_id = b.id
     LEFT JOIN suppliers sup ON i.supplier_id = sup.id
-    WHERE i.id = $1`;
+    LEFT JOIN item_groups ig ON i.item_group_id = ig.id
+    WHERE i.id = $1 AND i.deleted_at IS NULL`;
 
     const { rows } = await pool.query(query, [id]);
-    return rows[0];  // Make sure this returns a row
+    return rows[0];
 };
 
-// src/models/inventory.ts
 export const getAllItems = async (
-    filters: Partial<InventoryItem> = {},
+    filters: Partial<Inventory> = {},
     searchTerm?: string,
     page: number = 1,
     limit: number = 10
-): Promise<PaginatedResponse<InventoryItem>> => {
-
+) => {
     // Base query with joins
     let baseQuery = `
     SELECT 
       i.*,
       s.name as store_name,
       s.location as store_location,
-      sup.name as supplier_name
+      b.name as brand_name,
+      sup.name as supplier_name,
+      ig.group_name
     FROM inventory i
     LEFT JOIN stores s ON i.store_id = s.id
+    LEFT JOIN brands b ON i.brand_id = b.id
     LEFT JOIN suppliers sup ON i.supplier_id = sup.id
-  `;
+    LEFT JOIN item_groups ig ON i.item_group_id = ig.id
+    WHERE i.deleted_at IS NULL`;
 
     // Count query for pagination
-    let countQuery = `SELECT COUNT(*) FROM inventory i LEFT JOIN stores s ON i.store_id = s.id`;
+    let countQuery = `SELECT COUNT(*) FROM inventory i WHERE i.deleted_at IS NULL`;
 
     const whereClauses: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
 
-    // Filter handling (same as before)
-    // ...
+    // Add search term
+    if (searchTerm) {
+        whereClauses.push(`(i.item_name ILIKE $${paramIndex} OR i.item_code ILIKE $${paramIndex} OR i.sku ILIKE $${paramIndex})`);
+        values.push(`%${searchTerm}%`);
+        paramIndex++;
+    }
+
+    // Add filters
+    if (filters.store_id) {
+        whereClauses.push(`i.store_id = $${paramIndex}`);
+        values.push(filters.store_id);
+        paramIndex++;
+    }
+
+    if (filters.brand_id) {
+        whereClauses.push(`i.brand_id = $${paramIndex}`);
+        values.push(filters.brand_id);
+        paramIndex++;
+    }
+
+    if (filters.supplier_id) {
+        whereClauses.push(`i.supplier_id = $${paramIndex}`);
+        values.push(filters.supplier_id);
+        paramIndex++;
+    }
+
+    if (filters.item_group_id) {
+        whereClauses.push(`i.item_group_id = $${paramIndex}`);
+        values.push(filters.item_group_id);
+        paramIndex++;
+    }
+
+    if (filters.status !== undefined) {
+        whereClauses.push(`i.status = $${paramIndex}`);
+        values.push(filters.status);
+        paramIndex++;
+    }
 
     // Add WHERE clauses to both queries
     if (whereClauses.length > 0) {
-        const whereClause = ` WHERE ${whereClauses.join(' AND ')}`;
+        const whereClause = ` AND ${whereClauses.join(' AND ')}`;
         baseQuery += whereClause;
         countQuery += whereClause;
     }
 
     // Add pagination to main query
     baseQuery += `
-    ORDER BY i.name ASC
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-  `;
+    ORDER BY i.item_name ASC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(limit, (page - 1) * limit);
-    paramIndex += 2;
 
     // Execute both queries in parallel
     const [itemsResult, countResult] = await Promise.all([
-        pool.query<InventoryItem>(baseQuery, values),
+        pool.query<Inventory>(baseQuery, values),
         pool.query<{ count: string }>(countQuery, values.slice(0, -2)) // Exclude pagination params for count
     ]);
 
@@ -120,7 +152,8 @@ export const getAllItems = async (
         totalPages: Math.ceil(total / limit)
     };
 };
-export const updateItem = async (id: number, updates: Partial<InventoryItem>) => {
+
+export const updateItem = async (id: number, updates: Partial<Inventory>) => {
     const fields = [];
     const values = [];
     let paramIndex = 1;
@@ -134,28 +167,39 @@ export const updateItem = async (id: number, updates: Partial<InventoryItem>) =>
     }
 
     values.push(id);
-
     const query = `
     UPDATE inventory 
-    SET ${fields.join(', ')}, updated_at = NOW()
-    WHERE id = $${paramIndex}
+    SET ${fields.join(', ')}, updated_by = $${paramIndex}
+    WHERE id = $${paramIndex + 1} AND deleted_at IS NULL
     RETURNING *`;
 
     const { rows } = await pool.query(query, values);
     return rows[0];
 };
 
-export const deleteItem = async (id: number) => {
-    await pool.query('DELETE FROM inventory WHERE id = $1', [id]);
+export const deleteItem = async (id: number, deletedBy?: number) => {
+    const query = `
+        UPDATE inventory 
+        SET deleted_at = NOW(), updated_by = $2
+        WHERE id = $1 AND deleted_at IS NULL`;
+    await pool.query(query, [id, deletedBy]);
 };
 
 export const checkLowStock = async (threshold?: number) => {
+    const minThreshold = threshold || 5;
     const query = `
-    SELECT * FROM inventory 
-    WHERE stock <= ${threshold !== undefined ? '$1' : 'min_stock_level'}
-    ORDER BY stock ASC`;
+    SELECT 
+      i.*,
+      s.name as store_name,
+      b.name as brand_name
+    FROM inventory i
+    LEFT JOIN stores s ON i.store_id = s.id
+    LEFT JOIN brands b ON i.brand_id = b.id
+    WHERE i.stock <= i.min_stock_level 
+    AND i.stock <= $1 
+    AND i.deleted_at IS NULL
+    ORDER BY i.stock ASC`;
 
-    const values = threshold !== undefined ? [threshold] : [];
-    const { rows } = await pool.query(query, values);
+    const { rows } = await pool.query(query, [minThreshold]);
     return rows;
 };

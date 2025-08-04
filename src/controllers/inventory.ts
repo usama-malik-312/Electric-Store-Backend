@@ -1,8 +1,8 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import * as InventoryModel from '../models/inventory';
-import { InventoryItem } from '../types/inventory';
+import { AuthenticatedRequest } from '../middleware/auth';
 
-export const createItem = async (req: Request, res: Response) => {
+export const createItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const newItem = await InventoryModel.createItem(req.body);
         res.status(201).json(newItem);
@@ -12,23 +12,18 @@ export const createItem = async (req: Request, res: Response) => {
     }
 };
 
-// import { Request, Response } from 'express';
-
-export const getItem = async (req: Request, res: Response): Promise<void> => {
+export const getItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
-            //   return res.status(400).json({ error: 'Invalid ID parameter' });
             res.status(400).json({ error: 'Invalid ID parameter' });
-            return; // ✅ Now the function still returns `void`
+            return;
         }
 
         const item = await InventoryModel.getItemById(id);
         if (!item) {
-            //   return res.status(404).json({ error: 'Item not found' });
             res.status(404).json({ error: 'Item not found' });
-            return; // ✅ Now the function still returns `void`
-
+            return;
         }
 
         res.json(item);
@@ -38,15 +33,12 @@ export const getItem = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-
-
-// In your controller
-export const getAllItems = async (req: Request, res: Response) => {
+export const getAllItems = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const { search, page = '1', limit = '10', ...filters } = req.query;
 
         const paginatedResponse = await InventoryModel.getAllItems(
-            filters as Partial<InventoryItem>,
+            filters,
             search as string | undefined,
             parseInt(page as string),
             parseInt(limit as string)
@@ -61,7 +53,7 @@ export const getAllItems = async (req: Request, res: Response) => {
     }
 };
 
-export const updateItem = async (req: Request, res: Response): Promise<void> => {
+export const updateItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
 
@@ -84,9 +76,14 @@ export const updateItem = async (req: Request, res: Response): Promise<void> => 
     }
 };
 
-export const deleteItem = async (req: Request, res: Response) => {
+export const deleteItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        await InventoryModel.deleteItem(parseInt(req.params.id));
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            res.status(400).json({ error: 'Invalid ID parameter' });
+            return;
+        }
+        await InventoryModel.deleteItem(id, req.user?.id);
         res.status(204).send();
     } catch (error) {
         console.error('Error deleting item:', error);
@@ -94,7 +91,7 @@ export const deleteItem = async (req: Request, res: Response) => {
     }
 };
 
-export const getLowStockItems = async (req: Request, res: Response) => {
+export const getLowStockItems = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const threshold = req.query.threshold ? parseInt(req.query.threshold as string) : undefined;
         const items = await InventoryModel.checkLowStock(threshold);

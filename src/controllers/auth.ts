@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as UserModel from '../models/user';
 import { comparePasswords, generateToken, setAuthCookie } from '../utils/auth';
+import { AuthenticatedRequest } from '../middleware/auth';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -11,7 +12,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        const user = await UserModel.createUser({ email, phone, password, role });
+        // Only include properties that exist in the User type
+        const user = await UserModel.createUser({
+            email, password,
+            first_name: '',
+            last_name: '',
+            phone: phone || '',
+            role: role || 'user'
+        });
         const token = generateToken(user.id);
 
         setAuthCookie(res, token);
@@ -76,7 +84,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 //     }
 // };
 
-export const logout = async (req: Request, res: Response): Promise<void> => {
+export const logout = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         res.clearCookie('token'); // assuming you're using a cookie-based token
         res.status(200).json({ message: 'Logged out successfully' });
