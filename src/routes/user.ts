@@ -1,20 +1,17 @@
 import express from 'express';
 import * as UserController from '../controllers/user';
-import { protect, isOwner } from '../middleware/auth';
+import { authMiddleware, roleMiddleware } from '../middleware/auth';
 
 const router = express.Router();
 
-// Protect all routes
-// router.use(protect);
+// All routes require authentication
+router.use(authMiddleware);
 
-// Owner-only routes
-router.post('/', UserController.createUser);
-router.get('/', UserController.getUsers);
-router.get('/:id', UserController.getUserById);
-router.put('/:id', UserController.updateUser);
-router.delete('/:id', UserController.deleteUser);
-
-// All authenticated users
-// router.get('/me', UserController.getMe);
+// CRUD routes - owner only
+router.post('/', roleMiddleware('owner'), UserController.createUser);
+router.get('/', roleMiddleware('owner', 'admin'), UserController.getUsers);
+router.get('/:id', roleMiddleware('owner', 'admin'), UserController.getUserById);
+router.put('/:id', roleMiddleware('owner'), UserController.updateUser);
+router.delete('/:id', roleMiddleware('owner'), UserController.deleteUser);
 
 export default router;

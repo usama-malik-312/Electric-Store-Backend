@@ -60,7 +60,8 @@ export const getAllItems = async (
     filters: Partial<Inventory> = {},
     searchTerm?: string,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    sort: string = 'item_name ASC'
 ) => {
     // Base query with joins
     let baseQuery = `
@@ -130,9 +131,9 @@ export const getAllItems = async (
         countQuery += whereClause;
     }
 
-    // Add pagination to main query
+    // Add sorting and pagination to main query
     baseQuery += `
-    ORDER BY i.item_name ASC
+    ORDER BY i.${sort.replace(' ASC', '').replace(' DESC', '')} ${sort.includes('DESC') ? 'DESC' : 'ASC'}
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(limit, (page - 1) * limit);
 
@@ -185,9 +186,9 @@ export const deleteItem = async (id: number, deletedBy?: number) => {
     await pool.query(query, [id, deletedBy]);
 };
 
-export const checkLowStock = async (threshold?: number) => {
+export const checkLowStock = async (threshold?: number, storeId?: number) => {
     const minThreshold = threshold || 5;
-    const query = `
+    let query = `
     SELECT 
       i.*,
       s.name as store_name,
@@ -197,9 +198,42 @@ export const checkLowStock = async (threshold?: number) => {
     LEFT JOIN brands b ON i.brand_id = b.id
     WHERE i.stock <= i.min_stock_level 
     AND i.stock <= $1 
-    AND i.deleted_at IS NULL
-    ORDER BY i.stock ASC`;
+    AND i.deleted_at IS NULL`;
+    
+    const params: any[] = [minThreshold];
+    
+    if (storeId) {
+        query += ` AND i.store_id = $2`;
+        params.push(storeId);
+    }
+    
+    query += ` ORDER BY i.stock ASC`;
 
-    const { rows } = await pool.query(query, [minThreshold]);
+    const { rows } = await pool.query(query, params);
+    return rows;
+};
+
+export const getItemsDropdown = async (storeId?: number) => {
+    let query = `
+    SELECT 
+        id,
+        item_code,
+        item_name,
+        selling_price,
+        stock,
+        unit
+    FROM inventory
+    WHERE deleted_at IS NULL AND status = 'active'`;
+    
+    const params: any[] = [];
+    
+    if (storeId) {
+        query += ` AND store_id = $1`;
+        params.push(storeId);
+    }
+    
+    query += ` ORDER BY item_name ASC`;
+
+    const { rows } = await pool.query(query, params);
     return rows;
 };

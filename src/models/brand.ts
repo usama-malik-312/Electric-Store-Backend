@@ -29,7 +29,8 @@ export const getBrandById = async (id: number) => {
 export const getPaginatedBrands = async (
     page: number = 1,
     limit: number = 10,
-    search?: string
+    search?: string,
+    sort: string = 'name ASC'
 ) => {
     const offset = (page - 1) * limit;
     let query = 'SELECT * FROM brands WHERE deleted_at IS NULL';
@@ -40,7 +41,9 @@ export const getPaginatedBrands = async (
         values.push(`%${search}%`);
     }
 
-    query += ` ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    const sortField = sort.replace(' ASC', '').replace(' DESC', '').replace(/[^a-zA-Z0-9_]/g, '');
+    const sortDirection = sort.includes('DESC') ? 'DESC' : 'ASC';
+    query += ` ORDER BY ${sortField} ${sortDirection} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
     values.push(limit, offset);
 
     const { rows } = await pool.query(query, values);
@@ -54,6 +57,13 @@ export const getPaginatedBrands = async (
         limit,
         totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
     };
+};
+
+export const getBrandsDropdown = async () => {
+    const { rows } = await pool.query(
+        'SELECT id, name FROM brands WHERE deleted_at IS NULL ORDER BY name ASC'
+    );
+    return rows;
 };
 
 export const updateBrand = async (id: number, brand: Partial<Brand>) => {

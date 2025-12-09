@@ -1,29 +1,57 @@
 import { Response } from 'express';
 import * as UserModel from '../models/user';
 import { AuthenticatedRequest } from '../middleware/auth';
-
+import { getPaginationParams, buildPaginationResponse, getSortParams } from '../utils/pagination';
 
 export const createUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const user = await UserModel.createUser(req.body);
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create user' });
+    const userData = {
+      ...req.body,
+      created_by: req.user?.id
+    };
+    const user = await UserModel.createUser(userData);
+    res.status(201).json({
+      success: true,
+      data: user
+    });
+  } catch (error: any) {
+    if (error.code === '23505') {
+      res.status(409).json({ 
+        success: false,
+        error: 'User with this email or phone already exists' 
+      });
+      return;
+    }
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to create user' 
+    });
   }
 };
 
 export const getUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { page = '1', limit = '10', search } = req.query;
-    const paginatedResponse = await UserModel.getPaginatedUsers(
-      parseInt(page as string),
-      parseInt(limit as string),
-      search as string | undefined
+    const { page, limit } = getPaginationParams(req);
+    const search = req.query.search as string | undefined;
+    const sort = getSortParams(req, 'created_at DESC');
+    
+    const result = await UserModel.getPaginatedUsers(
+      page,
+      limit,
+      search,
+      sort
     );
-    res.json(paginatedResponse);
+    
+    res.json({
+      success: true,
+      ...buildPaginationResponse(result.data, result.total, page, limit)
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error' 
+    });
   }
 };
 
@@ -31,17 +59,29 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid user ID' });
+      res.status(400).json({ 
+        success: false,
+        error: 'Invalid user ID' 
+      });
       return;
     }
     const user = await UserModel.findUserById(id);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
       return;
     }
-    res.json(user);
+    res.json({
+      success: true,
+      data: user
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch user' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch user' 
+    });
   }
 };
 
@@ -49,17 +89,33 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid user ID' });
+      res.status(400).json({ 
+        success: false,
+        error: 'Invalid user ID' 
+      });
       return;
     }
-    const updatedUser = await UserModel.updateUser(id, req.body);
+    const updateData = {
+      ...req.body,
+      updated_by: req.user?.id
+    };
+    const updatedUser = await UserModel.updateUser(id, updateData);
     if (!updatedUser) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
       return;
     }
-    res.json(updatedUser);
+    res.json({
+      success: true,
+      data: updatedUser
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update user' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update user' 
+    });
   }
 };
 
@@ -67,12 +123,21 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response): Prom
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid user ID' });
+      res.status(400).json({ 
+        success: false,
+        error: 'Invalid user ID' 
+      });
       return;
     }
-    await UserModel.deleteUser(id);
-    res.status(204).send();
+    await UserModel.deleteUser(id, req.user?.id);
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully'
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete user' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete user' 
+    });
   }
 };

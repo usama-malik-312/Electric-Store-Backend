@@ -58,7 +58,8 @@ export const findUserByEmailOrPhone = async (identifier: string) => {
 export const getPaginatedUsers = async (
     page: number = 1,
     limit: number = 10,
-    search?: string
+    search?: string,
+    sort: string = 'created_at DESC'
 ) => {
     const offset = (page - 1) * limit;
     let query = `
@@ -68,20 +69,30 @@ export const getPaginatedUsers = async (
     let paramIndex = 1;
 
     if (search) {
-        query += ` AND (first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR full_name ILIKE $1)`;
+        query += ` AND (first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR phone ILIKE $${paramIndex} OR full_name ILIKE $${paramIndex})`;
         values.push(`%${search}%`);
         paramIndex++;
     }
 
+    const sortField = sort.replace(' ASC', '').replace(' DESC', '').replace(/[^a-zA-Z0-9_]/g, '');
+    const sortDirection = sort.includes('DESC') ? 'DESC' : 'ASC';
     query += `
-    ORDER BY created_at DESC
+    ORDER BY ${sortField} ${sortDirection}
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
     values.push(limit, offset);
 
     const { rows } = await pool.query(query, values);
-    const countQuery = `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL${search ? ' AND (first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR full_name ILIKE $1)' : ''}`;
-    const countResult = await pool.query(countQuery, search ? [`%${search}%`] : []);
+    
+    let countQuery = `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`;
+    const countValues = [];
+    
+    if (search) {
+        countQuery += ` AND (first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR full_name ILIKE $1)`;
+        countValues.push(`%${search}%`);
+    }
+    
+    const countResult = await pool.query(countQuery, countValues);
 
     return {
         data: rows,

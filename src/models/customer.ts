@@ -34,23 +34,51 @@ export const getCustomerById = async (id: number) => {
 export const getPaginatedCustomers = async (
     page: number = 1,
     limit: number = 10,
-    search?: string
+    search?: string,
+    status?: string,
+    sort: string = 'name ASC'
 ) => {
     const offset = (page - 1) * limit;
     let query = 'SELECT * FROM customers WHERE deleted_at IS NULL';
     const values = [];
+    let paramIndex = 1;
 
-    if (search) {
-        query += ' AND (name ILIKE $1 OR customer_code ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)';
-        values.push(`%${search}%`);
+    if (status) {
+        query += ` AND status = $${paramIndex}`;
+        values.push(status);
+        paramIndex++;
     }
 
-    query += ` ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    if (search) {
+        query += ` AND (name ILIKE $${paramIndex} OR customer_code ILIKE $${paramIndex} OR phone ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+        values.push(`%${search}%`);
+        paramIndex++;
+    }
+
+    const sortField = sort.replace(' ASC', '').replace(' DESC', '').replace(/[^a-zA-Z0-9_]/g, '');
+    const sortDirection = sort.includes('DESC') ? 'DESC' : 'ASC';
+    query += ` ORDER BY ${sortField} ${sortDirection} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(limit, offset);
 
     const { rows } = await pool.query(query, values);
-    const countQuery = `SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL${search ? ' AND (name ILIKE $1 OR customer_code ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)' : ''}`;
-    const countResult = await pool.query(countQuery, search ? [`%${search}%`] : []);
+
+    // Build count query
+    let countQuery = 'SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL';
+    const countValues = [];
+    let countParamIndex = 1;
+
+    if (status) {
+        countQuery += ` AND status = $${countParamIndex}`;
+        countValues.push(status);
+        countParamIndex++;
+    }
+
+    if (search) {
+        countQuery += ` AND (name ILIKE $${countParamIndex} OR customer_code ILIKE $${countParamIndex} OR phone ILIKE $${countParamIndex} OR email ILIKE $${countParamIndex})`;
+        countValues.push(`%${search}%`);
+    }
+
+    const countResult = await pool.query(countQuery, countValues);
 
     return {
         data: rows,
@@ -59,6 +87,13 @@ export const getPaginatedCustomers = async (
         limit,
         totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
     };
+};
+
+export const getCustomersDropdown = async () => {
+    const { rows } = await pool.query(
+        'SELECT id, name, customer_code FROM customers WHERE deleted_at IS NULL AND status = \'active\' ORDER BY name ASC'
+    );
+    return rows;
 };
 
 export const updateCustomer = async (id: number, customer: Partial<Customer>) => {
