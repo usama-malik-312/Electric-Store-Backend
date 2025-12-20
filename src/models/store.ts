@@ -34,7 +34,8 @@ export const getStoreById = async (id: number) => {
 export const getPaginatedStores = async (
   page: number = 1,
   limit: number = 10,
-  search?: string
+  search?: string,
+  sort: string = 'name ASC'
 ) => {
   const offset = (page - 1) * limit;
   let query = 'SELECT * FROM stores WHERE deleted_at IS NULL';
@@ -45,12 +46,22 @@ export const getPaginatedStores = async (
     values.push(`%${search}%`);
   }
 
-  query += ` ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+  const sortField = sort.replace(' ASC', '').replace(' DESC', '').replace(/[^a-zA-Z0-9_]/g, '');
+  const sortDirection = sort.includes('DESC') ? 'DESC' : 'ASC';
+  query += ` ORDER BY ${sortField} ${sortDirection} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
   values.push(limit, offset);
 
   const { rows } = await pool.query(query, values);
-  const countQuery = `SELECT COUNT(*) FROM stores WHERE deleted_at IS NULL${search ? ' AND (name ILIKE $1 OR store_code ILIKE $1 OR location ILIKE $1)' : ''}`;
-  const countResult = await pool.query(countQuery, search ? [`%${search}%`] : []);
+  
+  let countQuery = 'SELECT COUNT(*) FROM stores WHERE deleted_at IS NULL';
+  const countValues = [];
+  
+  if (search) {
+    countQuery += ' AND (name ILIKE $1 OR store_code ILIKE $1 OR location ILIKE $1)';
+    countValues.push(`%${search}%`);
+  }
+  
+  const countResult = await pool.query(countQuery, countValues);
 
   return {
     data: rows,
@@ -59,6 +70,13 @@ export const getPaginatedStores = async (
     limit,
     totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
   };
+};
+
+export const getStoresDropdown = async () => {
+  const { rows } = await pool.query(
+    'SELECT id, name, store_code FROM stores WHERE deleted_at IS NULL AND status = \'active\' ORDER BY name ASC'
+  );
+  return rows;
 };
 
 export const updateStore = async (id: number, store: Partial<Store>) => {

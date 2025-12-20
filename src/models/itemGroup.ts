@@ -28,7 +28,8 @@ export const getItemGroupById = async (id: number) => {
 export const getPaginatedItemGroups = async (
     page: number = 1,
     limit: number = 10,
-    search?: string
+    search?: string,
+    sort: string = 'group_name ASC'
 ) => {
     const offset = (page - 1) * limit;
     let query = 'SELECT * FROM item_groups WHERE deleted_at IS NULL';
@@ -39,12 +40,22 @@ export const getPaginatedItemGroups = async (
         values.push(`%${search}%`);
     }
 
-    query += ` ORDER BY group_name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    const sortField = sort.replace(' ASC', '').replace(' DESC', '').replace(/[^a-zA-Z0-9_]/g, '');
+    const sortDirection = sort.includes('DESC') ? 'DESC' : 'ASC';
+    query += ` ORDER BY ${sortField} ${sortDirection} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
     values.push(limit, offset);
 
     const { rows } = await pool.query(query, values);
-    const countQuery = `SELECT COUNT(*) FROM item_groups WHERE deleted_at IS NULL${search ? ' AND (group_name ILIKE $1 OR group_code ILIKE $1)' : ''}`;
-    const countResult = await pool.query(countQuery, search ? [`%${search}%`] : []);
+    
+    let countQuery = 'SELECT COUNT(*) FROM item_groups WHERE deleted_at IS NULL';
+    const countValues = [];
+    
+    if (search) {
+        countQuery += ' AND (group_name ILIKE $1 OR group_code ILIKE $1)';
+        countValues.push(`%${search}%`);
+    }
+    
+    const countResult = await pool.query(countQuery, countValues);
 
     return {
         data: rows,
@@ -85,4 +96,11 @@ export const deleteItemGroup = async (id: number, deletedBy?: number) => {
         SET deleted_at = NOW(), updated_by = $2
         WHERE id = $1 AND deleted_at IS NULL`;
     await pool.query(query, [id, deletedBy]);
+};
+
+export const getItemGroupsDropdown = async () => {
+    const { rows } = await pool.query(
+        'SELECT id, group_name, group_code FROM item_groups WHERE deleted_at IS NULL AND status = \'active\' ORDER BY group_name ASC'
+    );
+    return rows;
 }; 

@@ -2,23 +2,26 @@ import pool from '../config/db';
 import { hashPassword } from '../utils/auth';
 import { User } from '../types';
 
-export const createUser = async (user: Partial<User>) => {
+export const createUser = async (user: Partial<User & { role_id?: number }>) => {
     const hashedPassword = await hashPassword(user.password!);
     const fullName = user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim();
 
+    // Support both role_id and role string for backward compatibility
     const query = `
     INSERT INTO users (
-        email, password, role, full_name, phone, store_id, is_verified,
+        email, password, role, role_id, full_name, phone, store_id, is_verified,
         verification_token, password_reset_token, first_name, last_name,
         address, profile_image, status, created_by, notes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-    RETURNING id, email, role, full_name, phone, store_id, is_verified,
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    RETURNING id, email, role, role_id, full_name, phone, store_id, is_verified,
               first_name, last_name, address, profile_image, status, created_at`;
+    
     const values = [
         user.email,
         hashedPassword,
         user.role || 'user',
+        user.role_id || null, // Support role_id if provided
         fullName,
         user.phone,
         user.store_id,
@@ -33,6 +36,7 @@ export const createUser = async (user: Partial<User>) => {
         user.created_by,
         user.notes
     ];
+    
     const { rows } = await pool.query(query, values);
     return rows[0];
 };

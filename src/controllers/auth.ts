@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import * as UserModel from '../models/user';
+import * as RoleModel from '../models/role';
 import { 
     comparePasswords, 
     generateToken, 
     generateRefreshToken,
     setAuthCookie, 
-    clearAuthCookies,
-    getRolePermissions 
+    clearAuthCookies
 } from '../utils/auth';
 import { AuthenticatedRequest } from '../middleware/auth';
 import pool from '../config/db';
@@ -41,24 +41,57 @@ export const register = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Create user (only owners can create users with roles other than staff)
-        const user = await UserModel.createUser({
+        // Get role_id from role name if provided, otherwise default to staff
+        let roleId: number | null = null;
+        if (role) {
+            const roleData = await RoleModel.getRoleByName(role);
+            if (roleData) {
+                roleId = roleData.id!;
+            }
+        }
+        
+        // If no role_id found, get staff role as default
+        if (!roleId) {
+            const staffRole = await RoleModel.getRoleByName('staff');
+            roleId = staffRole?.id || null;
+        }
+
+        // Create user with role_id
+        const userData: any = {
             email, 
             password,
             first_name: '',
             last_name: '',
             phone: phone || '',
             role: role || 'staff'
-        });
+        };
+        
+        // Add role_id if we have it
+        if (roleId) {
+            userData.role_id = roleId;
+        }
+
+        const user = await UserModel.createUser(userData);
+
+        // Get user role and permissions from database
+        let permissions: string[] = [];
+        let roleName = user.role || 'staff';
+        
+        if (user.id && roleId) {
+            const roleData = await RoleModel.getUserRoleAndPermissions(user.id);
+            if (roleData) {
+                permissions = (roleData.permissions || []).map((p: any) => p.code);
+                roleName = roleData.name;
+            }
+        }
 
         // Generate tokens
-        const permissions = getRolePermissions(user.role);
         const token = generateToken({
-            id: user.id,
-            role: user.role,
+            id: user.id!,
+            role: roleName,
             permissions
         });
-        const refreshToken = generateRefreshToken(user.id);
+        const refreshToken = generateRefreshToken(user.id!);
 
         // Set cookies
         setAuthCookie(res, token, refreshToken);
@@ -76,11 +109,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
                     id: user.id,
                     email: user.email,
                     phone: user.phone,
-                    role: user.role,
+                    role: roleName,
+                    role_id: roleId,
                     full_name: user.full_name,
                 },
                 token,
-                refreshToken
+                refreshToken,
+                permissions
             }
         });
     } catch (error: any) {
@@ -140,14 +175,28 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
+        // Get user role and permissions from database
+        const roleData = await RoleModel.getUserRoleAndPermissions(user.id!);
+        
+        if (!roleData) {
+            res.status(500).json({
+                success: false,
+                error: 'User role not found'
+            });
+            return;
+        }
+
+        // Extract permission codes
+        const permissions = (roleData.permissions || []).map((p: any) => p.code);
+        const roleName = roleData.name;
+
         // Generate tokens with role and permissions
-        const permissions = getRolePermissions(user.role);
         const token = generateToken({
-            id: user.id,
-            role: user.role,
+            id: user.id!,
+            role: roleName,
             permissions
         });
-        const refreshToken = generateRefreshToken(user.id);
+        const refreshToken = generateRefreshToken(user.id!);
 
         // Set cookies
         setAuthCookie(res, token, refreshToken);
@@ -165,12 +214,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
                     id: user.id,
                     email: user.email,
                     phone: user.phone,
-                    role: user.role,
+                    role: roleName,
+                    role_id: roleData.id,
                     full_name: user.full_name,
                     store_id: user.store_id,
                 },
                 token,
-                refreshToken
+                refreshToken,
+                permissions
             }
         });
     } catch (error) {
@@ -217,20 +268,25 @@ export const getMe = async (req: AuthenticatedRequest, res: Response): Promise<v
             return;
         }
 
+        // Get role information
+        const roleData = await RoleModel.getUserRoleAndPermissions(user.id!);
+        const permissions = roleData ? (roleData.permissions || []).map((p: any) => p.code) : [];
+
         res.json({
             success: true,
             data: {
                 id: user.id,
                 email: user.email,
                 phone: user.phone,
-                role: user.role,
+                role: roleData?.name || user.role,
+                role_id: roleData?.id || null,
                 full_name: user.full_name,
                 first_name: user.first_name,
                 last_name: user.last_name,
                 store_id: user.store_id,
                 status: user.status,
                 profile_image: user.profile_image,
-                permissions: req.user.permissions
+                permissions: permissions.length > 0 ? permissions : req.user.permissions || []
             }
         });
     } catch (error) {
@@ -265,7 +321,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // Fetch user to get current role
+        // Fetch user to get current role and permissions
         const user = await UserModel.findUserById(decoded.id);
 
         if (!user || user.deleted_at || user.status !== 'active') {
@@ -276,11 +332,24 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
+        // Get user permissions from database
+        const roleData = await RoleModel.getUserRoleAndPermissions(user.id!);
+        
+        if (!roleData) {
+            res.status(500).json({
+                success: false,
+                error: 'User role not found'
+            });
+            return;
+        }
+
+        const permissions = (roleData.permissions || []).map((p: any) => p.code);
+        const roleName = roleData.name;
+
         // Generate new access token
-        const permissions = getRolePermissions(user.role);
         const newToken = generateToken({
-            id: user.id,
-            role: user.role,
+            id: user.id!,
+            role: roleName,
             permissions
         });
 

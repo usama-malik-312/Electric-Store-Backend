@@ -1,6 +1,7 @@
 import express from 'express';
 import * as BrandController from '../controllers/brand';
-import { authMiddleware, roleMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
+import { checkPermission } from '../middleware/permissions';
 
 const router = express.Router();
 
@@ -8,13 +9,13 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Dropdown endpoint (before /:id route)
-router.get('/dropdown', BrandController.getBrandsDropdown);
+router.get('/dropdown', checkPermission('brands.read'), BrandController.getBrandsDropdown);
 
-// CRUD routes
-router.post('/', roleMiddleware('owner', 'admin', 'manager'), BrandController.createBrand);
-router.get('/', BrandController.getBrands);
-router.get('/:id', BrandController.getBrand);
-router.put('/:id', roleMiddleware('owner', 'admin', 'manager'), BrandController.updateBrand);
-router.delete('/:id', roleMiddleware('owner', 'admin'), BrandController.deleteBrand);
+// CRUD routes with permission checks
+router.post('/', checkPermission('brands.create'), BrandController.createBrand);
+router.get('/', checkPermission('brands.read'), BrandController.getBrands);
+router.get('/:id', checkPermission('brands.read'), BrandController.getBrand);
+router.put('/:id', checkPermission('brands.update'), BrandController.updateBrand);
+router.delete('/:id', checkPermission('brands.delete'), BrandController.deleteBrand);
 
 export default router;

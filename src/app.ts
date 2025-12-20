@@ -10,6 +10,7 @@ import customerRoutes from './routes/customer';
 import brandRoutes from './routes/brand';
 import supplierRoutes from './routes/supplier';
 import itemGroupRoutes from './routes/itemGroup';
+import roleRoutes from './routes/role';
 import { logger } from './middleware/logger';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -83,6 +84,7 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/item-groups', itemGroupRoutes);
+app.use('/api/roles', roleRoutes);
 
 // 404 handler
 app.use((req, res) => {

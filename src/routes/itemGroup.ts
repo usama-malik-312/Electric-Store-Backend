@@ -1,17 +1,21 @@
 import express from 'express';
 import * as ItemGroupController from '../controllers/itemGroup';
-// import { protect, isOwner } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
+import { checkPermission } from '../middleware/permissions';
 
 const router = express.Router();
 
-// Protect all routes
-// router.use(protect);
+// All routes require authentication
+router.use(authMiddleware);
 
-// Owner-only routes
-router.post('/', ItemGroupController.createItemGroup);
-router.get('/', ItemGroupController.getItemGroups);
-router.get('/:id', ItemGroupController.getItemGroupById);
-router.put('/:id', ItemGroupController.updateItemGroup);
-router.delete('/:id', ItemGroupController.deleteItemGroup);
+// Dropdown endpoint (before /:id route)
+router.get('/dropdown', checkPermission('item_groups.read'), ItemGroupController.getItemGroupsDropdown);
+
+// CRUD routes with permission checks
+router.post('/', checkPermission('item_groups.create'), ItemGroupController.createItemGroup);
+router.get('/', checkPermission('item_groups.read'), ItemGroupController.getItemGroups);
+router.get('/:id', checkPermission('item_groups.read'), ItemGroupController.getItemGroupById);
+router.put('/:id', checkPermission('item_groups.update'), ItemGroupController.updateItemGroup);
+router.delete('/:id', checkPermission('item_groups.delete'), ItemGroupController.deleteItemGroup);
 
 export default router; 

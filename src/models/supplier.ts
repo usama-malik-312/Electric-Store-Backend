@@ -34,7 +34,8 @@ export const getSupplierById = async (id: number) => {
 export const getPaginatedSuppliers = async (
     page: number = 1,
     limit: number = 10,
-    search?: string
+    search?: string,
+    sort: string = 'name ASC'
 ) => {
     const offset = (page - 1) * limit;
     let query = 'SELECT * FROM suppliers WHERE deleted_at IS NULL';
@@ -45,12 +46,22 @@ export const getPaginatedSuppliers = async (
         values.push(`%${search}%`);
     }
 
-    query += ` ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    const sortField = sort.replace(' ASC', '').replace(' DESC', '').replace(/[^a-zA-Z0-9_]/g, '');
+    const sortDirection = sort.includes('DESC') ? 'DESC' : 'ASC';
+    query += ` ORDER BY ${sortField} ${sortDirection} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
     values.push(limit, offset);
 
     const { rows } = await pool.query(query, values);
-    const countQuery = `SELECT COUNT(*) FROM suppliers WHERE deleted_at IS NULL${search ? ' AND (name ILIKE $1 OR supplier_code ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)' : ''}`;
-    const countResult = await pool.query(countQuery, search ? [`%${search}%`] : []);
+    
+    let countQuery = 'SELECT COUNT(*) FROM suppliers WHERE deleted_at IS NULL';
+    const countValues = [];
+    
+    if (search) {
+        countQuery += ' AND (name ILIKE $1 OR supplier_code ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)';
+        countValues.push(`%${search}%`);
+    }
+    
+    const countResult = await pool.query(countQuery, countValues);
 
     return {
         data: rows,
@@ -91,4 +102,11 @@ export const deleteSupplier = async (id: number, deletedBy?: number) => {
         SET deleted_at = NOW(), updated_by = $2
         WHERE id = $1 AND deleted_at IS NULL`;
     await pool.query(query, [id, deletedBy]);
+};
+
+export const getSuppliersDropdown = async () => {
+    const { rows } = await pool.query(
+        'SELECT id, name, supplier_code FROM suppliers WHERE deleted_at IS NULL AND status = \'active\' ORDER BY name ASC'
+    );
+    return rows;
 }; 

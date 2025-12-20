@@ -1,17 +1,21 @@
 import express from 'express';
 import * as SupplierController from '../controllers/supplier';
-// import { protect, isOwner } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
+import { checkPermission } from '../middleware/permissions';
 
 const router = express.Router();
 
-// Protect all routes
-// router.use(protect);
+// All routes require authentication
+router.use(authMiddleware);
 
-// Owner-only routes
-router.post('/', SupplierController.createSupplier);
-router.get('/', SupplierController.getSuppliers);
-router.get('/:id', SupplierController.getSupplierById);
-router.put('/:id', SupplierController.updateSupplier);
-router.delete('/:id', SupplierController.deleteSupplier);
+// Dropdown endpoint (before /:id route)
+router.get('/dropdown', checkPermission('suppliers.read'), SupplierController.getSuppliersDropdown);
+
+// CRUD routes with permission checks
+router.post('/', checkPermission('suppliers.create'), SupplierController.createSupplier);
+router.get('/', checkPermission('suppliers.read'), SupplierController.getSuppliers);
+router.get('/:id', checkPermission('suppliers.read'), SupplierController.getSupplierById);
+router.put('/:id', checkPermission('suppliers.update'), SupplierController.updateSupplier);
+router.delete('/:id', checkPermission('suppliers.delete'), SupplierController.deleteSupplier);
 
 export default router; 

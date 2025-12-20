@@ -1,13 +1,21 @@
 import express from 'express';
 import * as StoreController from '../controllers/store';
-import { isOwner } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
+import { checkPermission } from '../middleware/permissions';
 
 const router = express.Router();
 
-router.post('/', StoreController.createStore);
-router.get('/', StoreController.getStores);
-// router.get('/:id', StoreController.getStore);
-// router.put('/:id', StoreController.updateStore);
-router.delete('/:id', StoreController.deleteStore);
+// All routes require authentication
+router.use(authMiddleware);
+
+// Dropdown endpoint (before /:id route)
+router.get('/dropdown', checkPermission('stores.read'), StoreController.getStoresDropdown);
+
+// CRUD routes with permission checks
+router.post('/', checkPermission('stores.create'), StoreController.createStore);
+router.get('/', checkPermission('stores.read'), StoreController.getStores);
+router.get('/:id', checkPermission('stores.read'), StoreController.getStore);
+router.put('/:id', checkPermission('stores.update'), StoreController.updateStore);
+router.delete('/:id', checkPermission('stores.delete'), StoreController.deleteStore);
 
 export default router;
