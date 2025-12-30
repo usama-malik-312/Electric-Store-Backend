@@ -24,21 +24,27 @@ export const createUser = async (user: Partial<User & { role_id?: number }>) => 
         user.role_id || null, // Support role_id if provided
         fullName,
         user.phone,
-        user.store_id,
+        user.store_id ?? null,
         user.is_verified ?? false,
-        user.verification_token,
-        user.password_reset_token,
-        user.first_name,
-        user.last_name,
-        user.address,
-        user.profile_image,
+        user.verification_token ?? null,
+        user.password_reset_token ?? null,
+        user.first_name ?? null,
+        user.last_name ?? null,
+        user.address ?? null,
+        user.profile_image ?? null,
         user.status || 'active',
-        user.created_by,
-        user.notes
+        user.created_by ?? null,
+        user.notes ?? null
     ];
     
-    const { rows } = await pool.query(query, values);
-    return rows[0];
+    try {
+        const { rows } = await pool.query(query, values);
+        return rows[0];
+    } catch (error) {
+        console.error('Error creating user:', error);
+        console.error('Values:', values);
+        throw error;
+    }
 };
 
 export const findUserById = async (id: number) => {
