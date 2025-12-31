@@ -5,7 +5,7 @@ export const createItem = async (item: Partial<Inventory>) => {
     const query = `
     INSERT INTO inventory (
         item_name, item_code, brand_id, supplier_id, item_group_id, 
-        description, unit, cost_price, selling_price, tax_percentage, 
+        description, unit, cost_price, price, tax_percentage, 
         discount, min_stock_level, stock, store_id, image, 
         status, created_by, notes
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
@@ -20,7 +20,7 @@ export const createItem = async (item: Partial<Inventory>) => {
         item.description,
         item.unit,
         item.cost_price,
-        item.selling_price,
+        item.price,
         item.tax_percentage || 0,
         item.discount || 0,
         item.min_stock_level || 5,
