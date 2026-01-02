@@ -114,17 +114,21 @@ export const updateItem = async (req: AuthenticatedRequest, res: Response): Prom
             return;
         }
 
-        const updateData = {
-            ...req.body,
+        // Remove fields that shouldn't be updated
+        const { created_by, created_at, deleted_at, updated_by, updated_at, id: _, ...updateData } = req.body;
+        
+        // Add updated_by from authenticated user (will be set in model)
+        const updatePayload = {
+            ...updateData,
             updated_by: req.user?.id
         };
 
-        const updatedItem = await InventoryModel.updateItem(id, updateData);
+        const updatedItem = await InventoryModel.updateItem(id, updatePayload);
 
         if (!updatedItem) {
             res.status(404).json({ 
                 success: false,
-                error: 'Item not found' 
+                error: 'Item not found or no fields to update' 
             });
             return;
         }
@@ -133,11 +137,17 @@ export const updateItem = async (req: AuthenticatedRequest, res: Response): Prom
             success: true,
             data: updatedItem
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error updating item:', error);
-        res.status(500).json({ 
+        
+        // Provide more detailed error message
+        const errorMessage = error.message || 'Failed to update inventory item';
+        const statusCode = error.code === '23505' ? 409 : 500; // 409 for unique constraint violations
+        
+        res.status(statusCode).json({ 
             success: false,
-            error: 'Failed to update inventory item' 
+            error: errorMessage,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 };

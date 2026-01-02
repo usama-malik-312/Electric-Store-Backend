@@ -159,19 +159,46 @@ export const updateItem = async (id: number, updates: Partial<Inventory>) => {
     const values = [];
     let paramIndex = 1;
 
+    // Extract updated_by separately (set by controller from authenticated user)
+    const updatedBy = updates.updated_by;
+
+    // Fields that should not be updated from request body
+    const excludedFields = ['id', 'created_by', 'created_at', 'deleted_at', 'updated_by', 'updated_at'];
+    
+    // Field mapping: map frontend field names to database column names
+    const fieldMapping: Record<string, string> = {
+        'selling_price': 'price' // Map selling_price to price column if frontend sends it
+    };
+
     for (const [key, value] of Object.entries(updates)) {
-        if (value !== undefined && key !== 'id') {
-            fields.push(`${key} = $${paramIndex}`);
+        // Skip excluded fields and undefined values
+        if (value !== undefined && !excludedFields.includes(key)) {
+            // Use mapped field name if exists, otherwise use original key
+            const dbFieldName = fieldMapping[key] || key;
+            fields.push(`${dbFieldName} = $${paramIndex}`);
             values.push(value);
             paramIndex++;
         }
     }
 
+    // If no fields to update, return null
+    if (fields.length === 0 && !updatedBy) {
+        return null;
+    }
+
+    // Add updated_by and updated_at at the end
+    if (updatedBy !== undefined) {
+        fields.push(`updated_by = $${paramIndex}`);
+        values.push(updatedBy);
+        paramIndex++;
+    }
+    fields.push(`updated_at = NOW()`);
+
     values.push(id);
     const query = `
     UPDATE inventory 
-    SET ${fields.join(', ')}, updated_by = $${paramIndex}
-    WHERE id = $${paramIndex + 1} AND deleted_at IS NULL
+    SET ${fields.join(', ')}
+    WHERE id = $${paramIndex} AND deleted_at IS NULL
     RETURNING *`;
 
     const { rows } = await pool.query(query, values);
@@ -219,7 +246,7 @@ export const getItemsDropdown = async (storeId?: number) => {
         id,
         item_code,
         item_name,
-        selling_price,
+        price,
         stock,
         unit
     FROM inventory
