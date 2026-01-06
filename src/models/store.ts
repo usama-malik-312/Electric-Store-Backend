@@ -110,3 +110,10 @@ export const deleteStore = async (id: number, deletedBy?: number) => {
     WHERE id = $1 AND deleted_at IS NULL`;
   await pool.query(query, [id, deletedBy]);
 };
+
+export const getDefaultStore = async () => {
+  const { rows } = await pool.query(
+    'SELECT id FROM stores WHERE deleted_at IS NULL AND status = \'active\' ORDER BY id ASC LIMIT 1'
+  );
+  return rows[0]?.id || null;
+};

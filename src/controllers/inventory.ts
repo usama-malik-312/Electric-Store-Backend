@@ -1,12 +1,28 @@
 import { Response } from 'express';
 import * as InventoryModel from '../models/inventory';
+import * as StoreModel from '../models/store';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { getPaginationParams, buildPaginationResponse, validateMandatoryFilters, getSortParams } from '../utils/pagination';
 
 export const createItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+        // If store_id is not provided, use default store
+        let storeId = req.body.store_id;
+        if (!storeId) {
+            const defaultStoreId = await StoreModel.getDefaultStore();
+            if (!defaultStoreId) {
+                res.status(400).json({
+                    success: false,
+                    error: 'No store available. Please create a store first or provide a store_id.'
+                });
+                return;
+            }
+            storeId = defaultStoreId;
+        }
+
         const itemData = {
             ...req.body,
+            store_id: storeId,
             created_by: req.user?.id
         };
         const newItem = await InventoryModel.createItem(itemData);
@@ -58,23 +74,13 @@ export const getItem = async (req: AuthenticatedRequest, res: Response): Promise
 
 export const getAllItems = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        // Validate mandatory filters
-        const validation = validateMandatoryFilters(req, ['store_id']);
-        if (!validation.isValid) {
-            res.status(400).json({
-                success: false,
-                error: `Missing required filters: ${validation.missing.join(', ')}`
-            });
-            return;
-        }
-
         const { page, limit, offset } = getPaginationParams(req);
         const search = req.query.search as string | undefined;
         const sort = getSortParams(req, 'item_name ASC');
         
-        // Extract filters
+        // Extract filters - all optional now
         const filters: any = {
-            store_id: parseInt(req.query.store_id as string),
+            store_id: req.query.store_id ? parseInt(req.query.store_id as string) : undefined,
             status: req.query.status as string | undefined,
             brand_id: req.query.brand_id ? parseInt(req.query.brand_id as string) : undefined,
             supplier_id: req.query.supplier_id ? parseInt(req.query.supplier_id as string) : undefined,
