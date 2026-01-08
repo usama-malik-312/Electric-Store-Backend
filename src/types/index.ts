@@ -128,6 +128,40 @@ export interface User {
     notes?: string;
 }
 
+export interface SaleItem {
+    id?: number;
+    sale_id?: number;
+    item_id: number;
+    item_name?: string;
+    item_code?: string;
+    quantity: number;
+    unit_price: number;
+    discount?: number;
+    tax?: number;
+    total_price: number;
+}
+
+export interface Sale {
+    id?: number;
+    invoice_number?: string;
+    customer_id?: number;
+    customer_name?: string;
+    store_id: number;
+    store_name?: string;
+    total_amount: number;
+    discount?: number;
+    tax?: number;
+    final_amount: number;
+    payment_method?: string;
+    payment_status?: string;
+    status?: string;
+    notes?: string;
+    created_by?: number;
+    user_id?: number;  // Support both user_id and created_by
+    created_at?: string;
+    items?: SaleItem[];
+}
+
 export interface PaginatedResponse<T> {
     data: T[];
     total: number;

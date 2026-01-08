@@ -485,3 +485,5 @@ const fetchInventoryItems = async () => {
 
 This implementation provides maximum flexibility while maintaining a clean and intuitive user experience.
 
+
+
